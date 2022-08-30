@@ -1,0 +1,9 @@
+
+set(SOURCE
+	${SOURCE}
+	${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/exception.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/param_maker.cpp
+	PARENT_SCOPE
+)
+
