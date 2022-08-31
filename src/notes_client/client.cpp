@@ -99,11 +99,19 @@ std::vector<note> client::get_notes() {
 			assert(node.HasMember("last_updated_at"));
 			assert(node.HasMember("contents"));
 #endif
+			//dates will only consist of yyyy-mm-dd hh:mm:ss
+			const std::string   created_at{node["created_at"]["date"].GetString()},
+								last_updated_at{
+				node["last_updated_at"].IsNull() 
+					? "" 
+					: node["last_updated_at"]["date"].GetString()
+			};
+
 			result.push_back({  
 				node["id"].GetInt(),
 				node["color_id"].GetInt(),
-				node["created_at"]["date"].GetString(),
-				node["last_updated_at"].IsNull() ? "" : node["last_updated_at"]["date"].GetString(),
+				created_at.substr(0, 18),
+				last_updated_at.size() ? last_updated_at.substr(0, 18) : last_updated_at,
 				node["contents"].GetString()
 			});
 		}
