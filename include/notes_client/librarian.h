@@ -22,10 +22,14 @@ class librarian {
  */
 	void                    make_index(const std::vector<note>&);
 	const std::vector<note>&    get_cards() const {return index_cards;}
-	
-	private:
-
 	void                    read_index();
+	bool                    has_note(int) const;
+/**
+ * retrieves the note with the given id, throws if cannot be found!
+ */
+	const note&             get_note(int) const;
+
+	private:
 
 	lm::logger&             logger;
 	std::vector<note>       index_cards;  //not really index cards, since they contain the full text too

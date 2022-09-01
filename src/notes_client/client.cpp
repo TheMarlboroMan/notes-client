@@ -5,6 +5,7 @@
 #include <lm/log.h>
 #include <tools/json.h>
 #include <iostream>
+#include <sstream>
 
 using namespace notes_client;
 
@@ -130,6 +131,27 @@ void client::create_note(
 	const std::string& _text
 ) {
 
+	const std::string uri=base_uri+"/notes";
+	curlw::curl_request request{uri, curlw::curl_request::methods::POST};
+
+	param_maker pm{};
+	pm.make_param("contents", _text);
+	pm.make_param("color_id", 1); //TODO: in the future we could change this
+
+	auto response=request.add_header("notes-auth_token", token)
+		.set_payload(pm.to_string())
+		.send();
+
+	//we expect either a 400 (which should not happen, since we forbid 
+	//empty texts somewhere else in the program) or a 201. Let us go with
+	//the 201 and anything else is a failure.
+	if(201!=response.get_status_code()) {
+
+		lm::log(logger).warning()<<"unexpected status code when creating note. Response was "<<response.to_string()<<std::endl;
+		throw new_note_exception();
+	}
+
+	//TODO: we could at least return the location... but this will suffice for now.
 }
 
 void client::patch_note(
@@ -142,5 +164,22 @@ void client::patch_note(
 void client::delete_note(
 	int _note_id
 ) {
+
+	std::stringstream ss{};
+	ss<<base_uri<<"/notes/"<<_note_id;
+
+	std::string uri=ss.str();
+	curlw::curl_request request{uri, curlw::curl_request::methods::DELETE};
+
+	lm::log(logger).info()<<"will send a DELETE request to "<<uri<<std::endl;
+	auto response=request.add_header("notes-auth_token", token)
+		.send();
+
+	//we expect a 200 or bust.
+	if(200!=response.get_status_code()) {
+
+		lm::log(logger).warning()<<"unexpected status code when deleting note. Response was "<<response.to_string()<<std::endl;
+		throw delete_note_exception();
+	}
 
 }

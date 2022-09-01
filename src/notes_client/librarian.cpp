@@ -1,4 +1,5 @@
 #include <notes_client/librarian.h>
+#include <notes_client/exception.h>
 
 #include <tools/file_utils.h>
 #include <tools/json.h>
@@ -120,4 +121,31 @@ void librarian::read_index() {
 	}
 }
 
+bool librarian::has_note(
+	int _note_id
+) const {
 
+	for(const auto& card : index_cards) {
+
+		if(_note_id==card.id) {
+
+			return true;
+		}
+	}
+	return false;
+}
+
+const note& librarian::get_note(
+	int _note_id
+) const {
+
+	for(const auto& note : index_cards) {
+
+		if(_note_id==note.id) {
+
+			return note;
+		}
+	}
+
+	throw no_note_exception(_note_id);
+}

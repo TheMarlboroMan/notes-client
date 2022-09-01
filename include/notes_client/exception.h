@@ -36,6 +36,30 @@ class server_exception:
 	public:
 	            server_exception(const std::string&);
 };
+
+class new_note_exception:
+	public std::runtime_error {
+
+	public:
+	            new_note_exception();
+};
+
+class delete_note_exception:
+	public std::runtime_error {
+
+	public:
+				delete_note_exception();
+};
+
+class no_note_exception:
+	public std::runtime_error {
+
+	public:
+				no_note_exception(int);
+	const char * what() const noexcept {return err.c_str();}
+	private:
+	std::string err;
+};
 }
 
 

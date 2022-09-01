@@ -36,3 +36,28 @@ server_exception::server_exception(
 {
 
 }
+
+new_note_exception::new_note_exception(
+):
+	std::runtime_error("failed to create a new note, please, check the log")
+{
+
+}
+
+delete_note_exception::delete_note_exception(
+):
+	std::runtime_error("failed to delete note, please, check the log")
+{
+
+}
+
+no_note_exception::no_note_exception(
+	int _note_id
+):
+	std::runtime_error("")
+{
+
+	std::stringstream ss;
+	ss<<"could not find note with id "<<_note_id;
+	err=ss.str();
+}
