@@ -15,8 +15,8 @@ librarian::librarian(
 	const std::string& _index_file,
 	lm::logger& _logger
 ):
-	index_file{_index_file},
-	logger{_logger}
+	logger{_logger},
+	index_file{_index_file}
 {
 
 	read_index();

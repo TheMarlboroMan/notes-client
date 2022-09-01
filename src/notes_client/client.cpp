@@ -140,6 +140,7 @@ void client::create_note(
 
 	auto response=request.add_header("notes-auth_token", token)
 		.set_payload(pm.to_string())
+		.add_header("content-type", "application/json")
 		.send();
 
 	//we expect either a 400 (which should not happen, since we forbid 
@@ -159,6 +160,29 @@ void client::patch_note(
 	const std::string& _text
 ) {
 
+	param_maker pm{};
+	pm.make_param("contents", _text);
+	pm.make_param("color_id", 1); //TODO: in the future we could change this
+
+	std::stringstream ss{};
+	ss<<base_uri<<"/notes/"<<_note_id;
+	std::string uri=ss.str();
+
+	curlw::curl_request request{uri, curlw::curl_request::methods::PATCH};
+	request.set_payload(pm.to_string())
+		.add_header("content-type", "application/json");
+
+
+	lm::log(logger).info()<<"will send a PATCH request to "<<uri<<std::endl;
+	auto response=request.add_header("notes-auth_token", token)
+		.send();
+
+	//we expect a 200 or bust.
+	if(200!=response.get_status_code()) {
+
+		lm::log(logger).warning()<<"unexpected status code when patching note. Response was "<<response.to_string()<<std::endl;
+		throw patch_note_exception();
+	}
 }
 
 void client::delete_note(
@@ -181,5 +205,4 @@ void client::delete_note(
 		lm::log(logger).warning()<<"unexpected status code when deleting note. Response was "<<response.to_string()<<std::endl;
 		throw delete_note_exception();
 	}
-
 }

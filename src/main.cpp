@@ -292,7 +292,7 @@ void edit_note(
 			return;
 		}
 
-//TODO:		_client.create_note(contents);
+		_client.patch_note(_note_id, contents);
 		sync(_client, _librarian);
 		return;
 	}

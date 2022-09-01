@@ -60,6 +60,13 @@ class no_note_exception:
 	private:
 	std::string err;
 };
+
+class patch_note_exception:
+	public std::runtime_error {
+
+	public:
+	            patch_note_exception();
+};
 }
 
 

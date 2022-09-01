@@ -61,3 +61,9 @@ no_note_exception::no_note_exception(
 	ss<<"could not find note with id "<<_note_id;
 	err=ss.str();
 }
+
+patch_note_exception::patch_note_exception()
+	:std::runtime_error("failed to patch note, please, check the log")
+{
+
+}
