@@ -87,10 +87,12 @@ endif()
 add_library(lm SHARED IMPORTED)
 add_library(curlw SHARED IMPORTED)
 add_library(tools SHARED IMPORTED)
+add_library(appenv SHARED IMPORTED)
 
 set_target_properties(lm PROPERTIES IMPORTED_LOCATION /usr/local/lib/liblm.so)
 set_target_properties(curlw PROPERTIES IMPORTED_LOCATION /usr/local/lib/libcurlw.so)
 set_target_properties(tools PROPERTIES IMPORTED_LOCATION /usr/local/lib/libtools.so)
+set_target_properties(appenv PROPERTIES IMPORTED_LOCATION /usr/local/lib/libappenv.so)
 
 if(${BUILD_DEBUG})
 
@@ -124,5 +126,5 @@ set_target_properties(applib PROPERTIES OUTPUT_NAME applib)
 #Configure the executable, we want it into the "build directory" and we want all resources copied
 #to the build directory.
 add_executable(notes-client src/main.cpp)
-target_link_libraries(notes-client applib curlw lm curl tools stdc++fs)
+target_link_libraries(notes-client applib curlw lm curl tools appenv stdc++fs)
 

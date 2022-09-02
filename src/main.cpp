@@ -1,26 +1,30 @@
 #include <notes_client/client.h>
 #include <notes_client/librarian.h>
-#include <lm/ostream_logger.h>
+#include <notes_client/out_formatter.h>
+#include <notes_client/cli_input.h>
+#include <lm/file_logger.h>
 #include <lm/log.h>
 #include <tools/string_utils.h>
 #include <tools/file_utils.h>
+#include <appenv/env.h>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <memory>
 
 void sync(notes_client::client&, notes_client::librarian&);
 void new_note(notes_client::client&, notes_client::librarian&, lm::logger&);
 void delete_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
-void read_note(notes_client::librarian&, int);
+void read_note(notes_client::librarian&, notes_client::note_formatter&, int);
 void edit_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
 
 int main(int argc, char ** argv) {
 
-	if(3!=argc) {
+	if(4!=argc) {
 
-		std::cout<<"notes-client username pass"<<std::endl;
+		std::cout<<"notes-client uri username pass"<<std::endl;
 		return 0;
 	}
 	
@@ -32,98 +36,58 @@ int main(int argc, char ** argv) {
 
 	try {
 
-		lm::ostream_logger logger(std::cout);
-		notes_client::client client("http://notes.dpastor.com/api", logger);
+		appenv::env env{".notes-client", nullptr};
+		env.create_user_dir();
+
+		lm::file_logger logger(env.build_user_path("notes-client.log").c_str());
+		notes_client::client client(argv[1], logger);
 		notes_client::librarian librarian("library.json", logger);
 
-		std::string username{argv[1]}, pass{argv[2]};
+		std::string username{argv[2]}, pass{argv[3]};
 
 		//there will be no offline workflow and stuff, let's keep this simple
 		client.login(username, pass);
 		sync(client, librarian);
 		
-		bool running=true;
-		while(running) {
+		std::unique_ptr<notes_client::note_formatter> formatter{new notes_client::out_formatter{}};
+		notes_client::cli_input in{};
+
+		while(true) {
 
 			for(const auto& card : librarian.get_cards()) {
 
-				//TODO: This should be a formatter class.
-				std::string contents=card.contents.substr(0, 80);
-				tools::replace(contents, "\n", " ");
-				tools::replace(contents, "\r", " ");
-
-				std::cout<<"["<<card.id<<"] created at "<<card.created_at<<": "<<contents<<std::endl;
+				formatter->format_note_card(card, std::cout);
 			}
 
-			std::cout<<std::endl<<"(n)ew, (e)dit [n], (d)elete [n], (r)ead [n], (s)ync, e(x)it"<<std::endl<<">> ";
+			in.show_prompt();
 
-			std::string input{}, command{};
-			std::getline(std::cin, input);
-			std::stringstream ss{input};
+			auto input=in.get_input();
+			switch(input.command) {
 
-			ss>>command;
-
-			auto get_note_id=[&ss]() -> int {
-
-				int note_id=0;
-				ss>>note_id;
-				if(ss.fail() || note_id <=0 ) {
-
-					std::cout<<"bad input, use edit [number] where [number] is the note id"<<std::endl;
-					return 0;
-				}
-				
-				return note_id;
-			};
-
-			if(command=="exit" || command=="quit" || command == "q" || command == "x") {
-
-				running=false;
-				continue;
-			}
-			else if(command=="sync" || command=="s") {
-
-				sync(client, librarian);
-			}
-			else if(command=="new" || command=="n") {
-
-				new_note(client, librarian, logger);
-			}
-			else if(command=="edit" || command=="e") {
-
-				int note_id=get_note_id();
-				if(!note_id) {
-
+				case notes_client::user_input::commands::exit:
+					goto cleanup; //lol
+				case notes_client::user_input::commands::sync:
+					sync(client, librarian);
 					continue;
-				}
-
-				edit_note(client, librarian, logger, note_id);
-			}
-			else if(command=="delete" || command=="d") {
-
-				int note_id=get_note_id();
-				if(!note_id) {
-
+				case notes_client::user_input::commands::create:
+					new_note(client, librarian, logger);
 					continue;
-				}
-				delete_note(client, librarian, logger, note_id);
-			}
-			else if(command=="read" || command=="r") {
-
-				int note_id=get_note_id();
-				if(!note_id) {
-
+				case notes_client::user_input::commands::edit:
+					edit_note(client, librarian, logger, input.id);
 					continue;
-				}
-
-				read_note(librarian, note_id);
-			}
-			else {
-
-				std::cout<<"unrecognised command '"<<input<<"'"<<std::endl;
+				case notes_client::user_input::commands::remove:
+					delete_note(client, librarian, logger, input.id);
+					continue;
+				case notes_client::user_input::commands::read:
+					read_note(librarian, *(formatter.get()), input.id);
+					continue;
+				case notes_client::user_input::commands::error:
+					std::cout<<"unrecognised command '"<<input.error<<"'"<<std::endl;
+					continue;
 			}
 		}
 
+		cleanup: //lol
 		return 0;
 	}
 	catch(std::exception &e) {
@@ -149,6 +113,7 @@ void new_note(
 	lm::logger& _logger
 ) {
 
+	//TODO: This repeats...
 	char tmp_template[]="/tmp/notes-client.XXXXXX";
 	mkstemp(tmp_template);
 	const std::string tmp_file(tmp_template);
@@ -222,6 +187,7 @@ void delete_note(
 
 void read_note(
 	notes_client::librarian& _librarian,
+	notes_client::note_formatter& _formatter,
 	int _note_id
 ) {
 
@@ -232,7 +198,7 @@ void read_note(
 	}
 
 	const auto& note=_librarian.get_note(_note_id);
-	std::cout<<note.contents<<std::endl;
+	_formatter.format_note_full(note, std::cout);
 }
 
 
