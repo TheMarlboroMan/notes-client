@@ -10,8 +10,7 @@ Changes will be documented under Added, Changed, Deprecated, Removed, Fixed or S
 
 ## Unreleased
 ### Pending
-- put the library in the app dir
-- remove duplicated code when forking to edit/create
 - provide the option to store the uri in a config file, maybe?
-
+- passwords in the command line are not exactly safe, memory wise.
+- sync is not actually sync at all. Should be called "pull" or something.
 ## [v0.0.0] Ago 2022

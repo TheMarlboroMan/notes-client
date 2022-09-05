@@ -19,6 +19,7 @@ void new_note(notes_client::client&, notes_client::librarian&, lm::logger&);
 void delete_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
 void read_note(notes_client::librarian&, notes_client::note_formatter&, int);
 void edit_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
+std::string open_editor(const std::string&, lm::logger&);
 
 int main(int argc, char ** argv) {
 
@@ -41,7 +42,9 @@ int main(int argc, char ** argv) {
 
 		lm::file_logger logger(env.build_user_path("notes-client.log").c_str());
 		notes_client::client client(argv[1], logger);
-		notes_client::librarian librarian("library.json", logger);
+
+		std::string library_file{env.build_user_path("library.json")};
+		notes_client::librarian librarian(library_file, logger);
 
 		std::string username{argv[2]}, pass{argv[3]};
 
@@ -97,33 +100,33 @@ int main(int argc, char ** argv) {
 	}
 }
 
-void sync(
-	notes_client::client& _client,
-	notes_client::librarian& _librarian
-) {
-
-	const auto notes=_client.get_notes();
-	_librarian.make_index(notes);
-	_librarian.read_index();
-}
-
-void new_note(
-	notes_client::client& _client,
-	notes_client::librarian& _librarian,
+std::string open_editor(
+	const std::string& _contents,
 	lm::logger& _logger
 ) {
 
-	//TODO: This repeats...
 	char tmp_template[]="/tmp/notes-client.XXXXXX";
 	mkstemp(tmp_template);
 	const std::string tmp_file(tmp_template);
+
+	if(_contents.size()) {
+	
+		std::ofstream f{tmp_template};
+		f<<_contents;
+		f.close();
+	}
 
 	auto pid=fork();
 	if(0==pid) {
 
 		lm::log(_logger).info()<<"launching external editor into "<<tmp_file<<std::endl;
 
-		char *cmd[]={"$EDITOR", const_cast<char *>(tmp_file.c_str()), nullptr};
+		char *cmd[]={
+			const_cast<char *>("$EDITOR"),
+			const_cast<char *>(tmp_file.c_str()), 
+			nullptr
+		};
+
 		auto result=execvp(getenv("EDITOR"), cmd);
 		std::cerr<<"ERRNO: "<<errno<<" for result "<<result;
 		exit(0);
@@ -140,7 +143,7 @@ void new_note(
 		if(!tools::filesystem::exists(tmp_file)) {
 
 			lm::log(_logger).info()<<"editor process did not save any file, returning"<<std::endl;
-			return;
+			return "";
 		}
 
 		std::string contents=tools::dump_file(tmp_file);
@@ -149,21 +152,47 @@ void new_note(
 		if(!contents.size()) {
 
 			lm::log(_logger).info()<<"editor process saved empty file, returning"<<std::endl;
-			return;
+			return "";
 		}
 
-		_client.create_note(contents);
-		sync(_client, _librarian);
-		return;
+		return contents;
 	}
 
 	if(WIFSIGNALED(childflags)) {
 
 		lm::log(_logger).notice()<<"editor process was terminated by signal "<<WTERMSIG(childflags)<<std::endl;
-		return;
+		return "";
 	}
 
 	lm::log(_logger).notice()<<"editor process was neither finished, nor terminated. Go figure it out."<<std::endl;
+	return "";
+}
+
+void sync(
+	notes_client::client& _client,
+	notes_client::librarian& _librarian
+) {
+
+	const auto notes=_client.get_notes();
+	_librarian.make_index(notes);
+	_librarian.read_index();
+}
+
+void new_note(
+	notes_client::client& _client,
+	notes_client::librarian& _librarian,
+	lm::logger& _logger
+) {
+
+	const std::string contents=open_editor("", _logger);
+
+	if(!contents.size()) {
+
+		return;
+	}
+
+	_client.create_note(contents);
+	sync(_client, _librarian);
 }
 
 void delete_note(
@@ -216,59 +245,14 @@ void edit_note(
 	}
 
 	const auto note=_librarian.get_note(_note_id);
-	char tmp_template[]="/tmp/notes-client.XXXXXX";
-	mkstemp(tmp_template);
-	const std::string tmp_file(tmp_template);
-	
-	std::ofstream f{tmp_template};
-	f<<note.contents;
-	f.close();
+	const std::string contents=open_editor(note.contents, _logger);
 
-	auto pid=fork();
-	if(0==pid) {
+	if(!contents.size()) {
 
-		lm::log(_logger).info()<<"launching external editor into "<<tmp_file<<std::endl;
-
-		char *cmd[]={"$EDITOR", const_cast<char *>(tmp_file.c_str()), nullptr};
-		auto result=execvp(getenv("EDITOR"), cmd);
-		std::cerr<<"ERRNO: "<<errno<<" for result "<<result;
-		exit(0);
-	}
-
-	int childflags=0;
-	int options=0;
-	waitpid(pid, &childflags, options);
-
-	if(WIFEXITED(childflags)) {
-
-		lm::log(_logger).info()<<"editor process terminated with "<<WEXITSTATUS(childflags)<<" status"<<std::endl;
-
-		if(!tools::filesystem::exists(tmp_file)) {
-
-			lm::log(_logger).info()<<"editor process did not save any file, returning"<<std::endl;
-			return;
-		}
-
-		std::string contents=tools::dump_file(tmp_file);
-		tools::trim(contents);
-		tools::filesystem::remove(tmp_file);
-		if(!contents.size()) {
-
-			lm::log(_logger).info()<<"editor process saved empty file, returning"<<std::endl;
-			return;
-		}
-
-		_client.patch_note(_note_id, contents);
-		sync(_client, _librarian);
 		return;
 	}
 
-	if(WIFSIGNALED(childflags)) {
-
-		lm::log(_logger).notice()<<"editor process was terminated by signal "<<WTERMSIG(childflags)<<std::endl;
-		return;
-	}
-
-	lm::log(_logger).notice()<<"editor process was neither finished, nor terminated. Go figure it out."<<std::endl;
+	_client.patch_note(_note_id, contents);
+	sync(_client, _librarian);
 }
 
