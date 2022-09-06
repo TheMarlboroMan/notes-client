@@ -20,12 +20,14 @@ void delete_note(notes_client::client&, notes_client::librarian&, lm::logger&, i
 void read_note(notes_client::librarian&, notes_client::note_formatter&, int);
 void edit_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
 std::string open_editor(const std::string&, lm::logger&);
+std::string get_uri(int, char **, const appenv::env&);
 
 int main(int argc, char ** argv) {
+	
+	//The uri is optional in case we already provided one...
+	if(argc < 3 || argc > 4) {
 
-	if(4!=argc) {
-
-		std::cout<<"notes-client uri username pass"<<std::endl;
+		std::cout<<"notes-client username pass [uri]"<<std::endl;
 		return 0;
 	}
 	
@@ -41,12 +43,16 @@ int main(int argc, char ** argv) {
 		env.create_user_dir();
 
 		lm::file_logger logger(env.build_user_path("notes-client.log").c_str());
-		notes_client::client client(argv[1], logger);
+
+		std::string uri=get_uri(argc, argv, env);
+		lm::log(logger).info()<<"using '"<<uri<<"' as server uri"<<std::endl;
+
+		notes_client::client client(uri, logger);
 
 		std::string library_file{env.build_user_path("library.json")};
 		notes_client::librarian librarian(library_file, logger);
 
-		std::string username{argv[2]}, pass{argv[3]};
+		std::string username{argv[1]}, pass{argv[2]};
 
 		//there will be no offline workflow and stuff, let's keep this simple
 		client.login(username, pass);
@@ -256,3 +262,28 @@ void edit_note(
 	sync(_client, _librarian);
 }
 
+std::string get_uri(
+	int argc, 
+	char ** argv, 
+	const appenv::env& _env
+) {
+	
+	const std::string uri_file{_env.build_user_path("last_server")};
+	if(argc==4) {
+
+		std::string result{argv[3]};
+	
+		//store in the last server file...
+		std::ofstream of{uri_file};
+		of<<result;
+		
+		return result;
+	}
+
+	if(!tools::filesystem::exists(uri_file)) {
+
+		throw std::runtime_error("unable to locate last_server file, please. specify a uri at startup");
+	}
+
+	return tools::dump_file(uri_file);
+}
