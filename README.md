@@ -9,6 +9,10 @@
 - utf8tools
 - terminal-tools
 
+## transitive dependencies
+
+- curlw wraps libcurl calls. Tools uses rapidJson for JSON operations.
+
 ## Licensing
 
 All files in this project are under the Unlicense. 
