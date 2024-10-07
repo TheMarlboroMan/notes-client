@@ -15,11 +15,11 @@
 #include <memory>
 
 void sync(notes_client::client&, notes_client::librarian&);
-void new_note(notes_client::client&, notes_client::librarian&, lm::logger&);
+void new_note(notes_client::client&, notes_client::librarian&, lm::logger&, const std::string&);
 void delete_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
 void read_note(notes_client::librarian&, notes_client::note_formatter&, int);
-void edit_note(notes_client::client&, notes_client::librarian&, lm::logger&, int);
-std::string open_editor(const std::string&, lm::logger&);
+void edit_note(notes_client::client&, notes_client::librarian&, lm::logger&, int, const std::string&);
+std::string open_editor(const std::string&, const std::string&, lm::logger&);
 std::string get_uri(int, char **, const appenv::env&);
 
 int main(int argc, char ** argv) {
@@ -31,10 +31,15 @@ int main(int argc, char ** argv) {
 		return 0;
 	}
 	
-	if(nullptr==getenv("EDITOR")) {
+	const bool no_editor=nullptr==getenv("EDITOR");
 
-		std::cerr<<"error: EDITOR environment variable is not set"<<std::endl;
-		return 1;
+	std::string editor=no_editor
+		? "vim"
+		: getenv("EDITOR");
+
+	if(no_editor) {
+
+		std::cout<<"error: EDITOR environment variable is not set, assuming vim"<<std::endl;
 	}
 
 	try {
@@ -79,10 +84,10 @@ int main(int argc, char ** argv) {
 					sync(client, librarian);
 					continue;
 				case notes_client::user_input::commands::create:
-					new_note(client, librarian, logger);
+					new_note(client, librarian, logger, editor);
 					continue;
 				case notes_client::user_input::commands::edit:
-					edit_note(client, librarian, logger, input.id);
+					edit_note(client, librarian, logger, input.id, editor);
 					continue;
 				case notes_client::user_input::commands::remove:
 					delete_note(client, librarian, logger, input.id);
@@ -107,6 +112,7 @@ int main(int argc, char ** argv) {
 }
 
 std::string open_editor(
+	const std::string& _editor,
 	const std::string& _contents,
 	lm::logger& _logger
 ) {
@@ -128,12 +134,12 @@ std::string open_editor(
 		lm::log(_logger).info()<<"launching external editor into "<<tmp_file<<std::endl;
 
 		char *cmd[]={
-			const_cast<char *>("$EDITOR"),
+			const_cast<char *>(_editor.c_str()),
 			const_cast<char *>(tmp_file.c_str()), 
 			nullptr
 		};
 
-		auto result=execvp(getenv("EDITOR"), cmd);
+		auto result=execvp(_editor.c_str(), cmd);
 		std::cerr<<"ERRNO: "<<errno<<" for result "<<result;
 		exit(0);
 	}
@@ -187,10 +193,11 @@ void sync(
 void new_note(
 	notes_client::client& _client,
 	notes_client::librarian& _librarian,
-	lm::logger& _logger
+	lm::logger& _logger,
+	const std::string& _editor
 ) {
 
-	const std::string contents=open_editor("", _logger);
+	const std::string contents=open_editor(_editor, "", _logger);
 
 	if(!contents.size()) {
 
@@ -241,7 +248,8 @@ void edit_note(
 	notes_client::client& _client,
 	notes_client::librarian& _librarian,
 	lm::logger& _logger,
-	int _note_id
+	int _note_id,
+	const std::string& _editor
 ) {
 
 	if(!_librarian.has_note(_note_id)) {
@@ -251,7 +259,7 @@ void edit_note(
 	}
 
 	const auto note=_librarian.get_note(_note_id);
-	const std::string contents=open_editor(note.contents, _logger);
+	const std::string contents=open_editor(_editor, note.contents, _logger);
 
 	if(!contents.size()) {
 
