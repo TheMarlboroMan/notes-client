@@ -10,7 +10,6 @@ Changes will be documented under Added, Changed, Deprecated, Removed, Fixed or S
 
 ## Unreleased
 ### Pending
-- use cli_tools to add a square with the color of the note (libs are ready)
 - change note colors, maybe?
 - passwords in the command line are not exactly safe, memory wise.
 - sync is not actually sync at all. Should be called "pull" or something.
